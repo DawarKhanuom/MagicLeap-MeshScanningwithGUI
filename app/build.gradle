@@ -1,0 +1,106 @@
+apply plugin: 'com.android.application'
+
+def keystoreProperties = new Properties()
+def storeFilePrefix = ""
+if (project.hasProperty('root_path')) {
+    def keystorePropertiesFile = rootProject.file(root_path + "scripts/keystore.properties")
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    storeFilePrefix = root_path
+}
+
+android {
+    compileSdk 33
+    ndkVersion '26.2.11394342'
+
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile file(storeFilePrefix + keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+        }
+    }
+
+    defaultConfig {
+        applicationId = "com.magicleap.capi.sample.meshing"
+        minSdkVersion 29
+        targetSdk 33
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=c++_static'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'),
+                    'proguard-rules.pro'
+            signingConfig signingConfigs.release
+            externalNativeBuild {
+              cmake {
+                arguments '-DCMAKE_BUILD_TYPE=Release'
+              }
+            }
+        }
+    }
+
+    flavorDimensions 'cpuArch'
+    productFlavors {
+        ml2 {
+            dimension 'cpuArch'
+            ndk {
+                abiFilters 'x86_64'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            version '3.22.1+'
+            path 'src/main/cpp/CMakeLists.txt'
+        }
+
+        applicationVariants.all { variant ->
+            variant.outputs.all { output ->
+                outputFileName = applicationId;
+                if (variant.buildType.name == "release") {
+                    outputFileName += ".apk";
+                } else {
+                    outputFileName += "-debug.apk";
+                }
+            }
+        }
+    }
+}
+
+gradle.projectsEvaluated {
+    task cleanCxx {
+        doLast {
+            delete project.file(".cxx")
+        }
+    }
+
+    task cleanCxxDebug {
+        doLast {
+            delete project.file(".cxx/Debug")
+        }
+    }
+
+    task cleanCxxRelease {
+        doLast {
+            delete project.file(".cxx/Release")
+        }
+    }
+
+    externalNativeBuildCleanMl2Debug.dependsOn(cleanCxxDebug)
+    externalNativeBuildCleanMl2Release.dependsOn(cleanCxxRelease)
+    clean.dependsOn(cleanCxx)
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.appcompat:appcompat:1.0.2'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+}
